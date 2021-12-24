@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var formats = map[string]string{
@@ -19,26 +21,40 @@ var formats = map[string]string{
 	"sql":  "scripts",
 	"sh":   "scripts",
 	"bash": "scripts",
+	"pdf":  "pdf",
 }
 
 const OUTDIR = "garbage"
 
 func main() {
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatalf("could not get user's home dir: %v", err)
 	}
 
-	fis, err := ioutil.ReadDir(homeDir)
+	targetDirPtr := flag.String("targetDir", homeDir, "determine where the janitor should clean the files")
+	flag.Parse()
+
+	targetDir := *targetDirPtr
+	if !filepath.IsAbs(targetDir) {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("could not get cwd: %v", err)
+		}
+		targetDir = filepath.Join(wd, targetDir)
+	}
+
+	fis, err := ioutil.ReadDir(targetDir)
 	if err != nil {
-		log.Fatalf("could not read files in %s: %v", homeDir, err)
+		log.Fatalf("could not read files in %s: %v", *targetDirPtr, err)
 	}
 
 	for _, fi := range fis {
 		if fi.IsDir() {
 			continue
 		}
-		ext := filepath.Ext(fi.Name())
+		ext := strings.ToLower(filepath.Ext(fi.Name()))
 		if ext == "" {
 			continue
 		}
@@ -56,7 +72,7 @@ func main() {
 			log.Fatalf("could not create destination dir at %s: %v", destinationDir, err)
 		}
 
-		err = os.Rename(filepath.Join(homeDir, fi.Name()), filepath.Join(destinationDir, fi.Name()))
+		err = os.Rename(filepath.Join(targetDir, fi.Name()), filepath.Join(destinationDir, fi.Name()))
 		if err != nil {
 			log.Fatalf("could not move %s: %v", fi.Name(), err)
 		}
